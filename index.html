@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Launcher Portal</title>
+    <!-- PapaParse to convert Google Sheet CSV into live JSON -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #f2f2f7;
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --search-bg: #ffffff;
+            --font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-family);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 16px 20px 16px;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 600px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+        }
+
+        /* Header / Navigation bar inside view */
+        .view-header {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 24px;
+            position: relative;
+        }
+
+        .back-btn {
+            background: #e5e5ea;
+            border: none;
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: background 0.2s;
+        }
+
+        .back-btn:hover {
+            background: #d1d1d6;
+        }
+
+        .view-title {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        /* Apple Style Search Bar */
+        .search-wrapper {
+            width: 100%;
+            max-width: 520px;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 30px;
+            background: var(--search-bg);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+            color: var(--text-primary);
+            outline: none;
+            text-align: center;
+            transition: all 0.25s ease;
+        }
+
+        .search-input::placeholder {
+            color: #a1a1a6;
+            font-weight: 400;
+        }
+
+        .search-input:focus {
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            transform: translateY(-1px);
+        }
+
+        /* Loading Spinner */
+        #loading-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-top: 60px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid rgba(0,0,0,0.1);
+            border-top-color: #007aff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Apple App Grid Layout */
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 28px 16px;
+            width: 100%;
+            max-width: 520px;
+            justify-items: center;
+        }
+
+        /* App Item Container */
+        .app-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-decoration: none;
+            cursor: pointer;
+            width: 90px;
+            transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+            border: none;
+            background: none;
+        }
+
+        /* Apple Squircle App Icon */
+        .app-icon {
+            width: 76px;
+            height: 76px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 24px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            box-shadow: 0 8px 18px -2px var(--icon-shadow, rgba(0, 0, 0, 0.2));
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            user-select: none;
+        }
+
+        .app-card:active .app-icon {
+            transform: scale(0.90);
+        }
+
+        .app-card:hover .app-icon {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 22px -2px var(--icon-shadow, rgba(0, 0, 0, 0.3));
+        }
+
+        /* App Label */
+        .app-title {
+            margin-top: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            width: 100%;
+            letter-spacing: -0.2px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Footer */
+        footer {
+            margin-top: auto;
+            padding-top: 40px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-align: center;
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding-top: 24px;
+            }
+            .apps-grid {
+                grid-template-columns: repeat(4, 1fr);
+                gap: 22px 10px;
+            }
+            .app-card {
+                width: 76px;
+            }
+            .app-icon {
+                width: 64px;
+                height: 64px;
+                border-radius: 17px;
+                font-size: 20px;
+            }
+            .app-title {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Loading Indicator -->
+        <div id="loading-state">
+            <div class="spinner"></div>
+            <span>Loading Portal Data...</span>
+        </div>
+
+        <!-- MAIN VIEW: Category Launcher Grid -->
+        <div id="categories-view" class="hidden" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+            <div class="search-wrapper">
+                <input 
+                    type="text" 
+                    id="main-search-input" 
+                    class="search-input" 
+                    placeholder="Search categories..." 
+                    oninput="filterCategories()" 
+                    autocomplete="off"
+                />
+            </div>
+            <div id="categories-grid" class="apps-grid"></div>
+        </div>
+
+        <!-- DETAIL VIEW: Applications Inside Selected Category -->
+        <div id="detail-view" class="hidden" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+            <div class="view-header">
+                <button class="back-btn" onclick="goBackToCategories()">
+                    ← Back
+                </button>
+                <div id="detail-category-title" class="view-title">Category</div>
+            </div>
+
+            <div class="search-wrapper">
+                <input 
+                    type="text" 
+                    id="detail-search-input" 
+                    class="search-input" 
+                    placeholder="Search apps..." 
+                    oninput="filterDetailApps()" 
+                    autocomplete="off"
+                />
+            </div>
+
+            <div id="detail-grid" class="apps-grid"></div>
+        </div>
+
+    </div>
+
+    <!-- Mandatory Footer -->
+    <footer>
+        Made by Darpan Sukla
+    </footer>
+
+    <script>
+        // Direct link to Published Google Sheet CSV
+        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vR9w83_9w7PPNGYRN_Na7qV7a_-RFziQglSlWHwb2wxTv_b1j2s_uqoDqAR2eeQcrLBXogKBOjZRTm4/pub?gid=0&single=true&output=csv';
+
+        const palette = [
+            { bg: '#007aff', shadow: 'rgba(0, 122, 255, 0.45)' },
+            { bg: '#34c759', shadow: 'rgba(52, 199, 89, 0.45)' },
+            { bg: '#5856d6', shadow: 'rgba(88, 86, 214, 0.45)' },
+            { bg: '#ff9500', shadow: 'rgba(255, 149, 0, 0.45)' },
+            { bg: '#ff2d55', shadow: 'rgba(255, 45, 85, 0.45)' },
+            { bg: '#af52de', shadow: 'rgba(175, 82, 222, 0.45)' }
+        ];
+
+        let allData = [];
+        let categoriesMap = {};
+        let currentCategory = '';
+
+        function getInitials(name) {
+            if (!name) return 'AP';
+            const clean = name.trim().replace(/[^a-zA-Z0-9 ]/g, '');
+            if (clean.length < 2) return clean.toUpperCase();
+            return clean.substring(0, 2).toUpperCase();
+        }
+
+        async function loadAppData() {
+            try {
+                Papa.parse(SHEET_CSV_URL, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        allData = results.data.filter(item => item.Category && item['Website Name']);
+                        
+                        // Group items by Category
+                        categoriesMap = {};
+                        allData.forEach(item => {
+                            let cat = item.Category.trim();
+                            // Capitalize nicely
+                            cat = cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
+                            if (!categoriesMap[cat]) {
+                                categoriesMap[cat] = [];
+                            }
+                            categoriesMap[cat].push(item);
+                        });
+
+                        document.getElementById('loading-state').style.display = 'none';
+                        renderCategories(Object.keys(categoriesMap));
+                        document.getElementById('categories-view').classList.remove('hidden');
+                    },
+                    error: function(err) {
+                        console.error("Error fetching sheet:", err);
+                        document.getElementById('loading-state').innerHTML = '<span style="color:#ff3b30">Unable to load portal data.</span>';
+                    }
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function renderCategories(catList) {
+            const grid = document.getElementById('categories-grid');
+            grid.innerHTML = '';
+
+            if (catList.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; color: var(--text-secondary); font-size: 14px; margin-top:20px;">No categories found.</div>';
+                return;
+            }
+
+            catList.forEach((cat, index) => {
+                const theme = palette[index % palette.length];
+                const initials = getInitials(cat);
+                const count = categoriesMap[cat].length;
+
+                const btn = document.createElement('button');
+                btn.className = 'app-card';
+                btn.onclick = () => openCategory(cat);
+
+                btn.innerHTML = `
+                    <div class="app-icon" style="background-color: ${theme.bg}; --icon-shadow: ${theme.shadow};">
+                        ${initials}
+                    </div>
+                    <span class="app-title">${escapeHtml(cat)}</span>
+                `;
+                grid.appendChild(btn);
+            });
+        }
+
+        function filterCategories() {
+            const query = document.getElementById('main-search-input').value.toLowerCase().trim();
+            const allCats = Object.keys(categoriesMap);
+            const filtered = allCats.filter(cat => cat.toLowerCase().includes(query));
+            renderCategories(filtered);
+        }
+
+        function openCategory(catName) {
+            currentCategory = catName;
+            document.getElementById('detail-category-title').innerText = catName;
+            document.getElementById('detail-search-input').value = '';
+            
+            document.getElementById('categories-view').classList.add('hidden');
+            document.getElementById('detail-view').classList.remove('hidden');
+
+            renderDetailApps(categoriesMap[catName]);
+        }
+
+        function goBackToCategories() {
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('categories-view').classList.remove('hidden');
+            document.getElementById('main-search-input').value = '';
+            renderCategories(Object.keys(categoriesMap));
+        }
+
+        function renderDetailApps(appsList) {
+            const grid = document.getElementById('detail-grid');
+            grid.innerHTML = '';
+
+            if (appsList.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; color: var(--text-secondary); font-size: 14px; margin-top:20px;">No applications found in this category.</div>';
+                return;
+            }
+
+            appsList.forEach((app, index) => {
+                const name = app['Website Name'] || 'App';
+                const link = app['Website Link'] || '#';
+                const theme = palette[index % palette.length];
+                const initials = getInitials(name);
+
+                const card = document.createElement('a');
+                card.className = 'app-card';
+                card.href = link;
+                card.target = '_blank';
+                card.rel = 'noopener noreferrer';
+
+                card.innerHTML = `
+                    <div class="app-icon" style="background-color: ${theme.bg}; --icon-shadow: ${theme.shadow};">
+                        ${initials}
+                    </div>
+                    <span class="app-title">${escapeHtml(name)}</span>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function filterDetailApps() {
+            const query = document.getElementById('detail-search-input').value.toLowerCase().trim();
+            const apps = categoriesMap[currentCategory] || [];
+            const filtered = apps.filter(app => {
+                const name = (app['Website Name'] || '').toLowerCase();
+                return name.includes(query);
+            });
+            renderDetailApps(filtered);
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        window.addEventListener('DOMContentLoaded', loadAppData);
+    </script>
+</body>
+</html>
