@@ -187,18 +187,19 @@
             box-shadow: 0 12px 22px -2px var(--icon-shadow, rgba(0, 0, 0, 0.3));
         }
 
-        /* App Label */
+        /* App Label - Fully visible name with smaller text size that wraps neatly */
         .app-title {
-            margin-top: 8px;
-            font-size: 13px;
-            font-weight: 700;
+            margin-top: 6px;
+            font-size: 11px;
+            font-weight: 600;
             color: var(--text-primary);
             text-align: center;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
             width: 100%;
             letter-spacing: -0.2px;
+            line-height: 1.15;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            white-space: normal;
         }
 
         .hidden {
@@ -233,7 +234,7 @@
                 font-size: 20px;
             }
             .app-title {
-                font-size: 12px;
+                font-size: 10px;
             }
         }
     </style>
@@ -248,15 +249,15 @@
             <span>Loading Portal Data...</span>
         </div>
 
-        <!-- MAIN VIEW: Category Launcher Grid -->
+        <!-- MAIN VIEW: Category Launcher & Global Search -->
         <div id="categories-view" class="hidden" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
             <div class="search-wrapper">
                 <input 
                     type="text" 
                     id="main-search-input" 
                     class="search-input" 
-                    placeholder="Search categories..." 
-                    oninput="filterCategories()" 
+                    placeholder="Search apps or categories..." 
+                    oninput="handleGlobalSearch()" 
                     autocomplete="off"
                 />
             </div>
@@ -277,7 +278,7 @@
                     type="text" 
                     id="detail-search-input" 
                     class="search-input" 
-                    placeholder="Search apps..." 
+                    placeholder="Search apps in this category..." 
                     oninput="filterDetailApps()" 
                     autocomplete="off"
                 />
@@ -330,7 +331,6 @@
                         categoriesMap = {};
                         allData.forEach(item => {
                             let cat = item.Category.trim();
-                            // Capitalize nicely
                             cat = cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase();
                             if (!categoriesMap[cat]) {
                                 categoriesMap[cat] = [];
@@ -364,7 +364,6 @@
             catList.forEach((cat, index) => {
                 const theme = palette[index % palette.length];
                 const initials = getInitials(cat);
-                const count = categoriesMap[cat].length;
 
                 const btn = document.createElement('button');
                 btn.className = 'app-card';
@@ -374,17 +373,58 @@
                     <div class="app-icon" style="background-color: ${theme.bg}; --icon-shadow: ${theme.shadow};">
                         ${initials}
                     </div>
-                    <span class="app-title">${escapeHtml(cat)}</span>
+                    <span class="app-title" title="${escapeHtml(cat)}">${escapeHtml(cat)}</span>
                 `;
                 grid.appendChild(btn);
             });
         }
 
-        function filterCategories() {
+        function renderAppsGrid(appsList) {
+            const grid = document.getElementById('categories-grid');
+            grid.innerHTML = '';
+
+            if (appsList.length === 0) {
+                grid.innerHTML = '<div style="grid-column: 1/-1; color: var(--text-secondary); font-size: 14px; margin-top:20px;">No applications found.</div>';
+                return;
+            }
+
+            appsList.forEach((app, index) => {
+                const name = app['Website Name'] || 'App';
+                const link = app['Website Link'] || '#';
+                const theme = palette[index % palette.length];
+                const initials = getInitials(name);
+
+                const card = document.createElement('a');
+                card.className = 'app-card';
+                card.href = link;
+                card.target = '_blank';
+                card.rel = 'noopener noreferrer';
+
+                card.innerHTML = `
+                    <div class="app-icon" style="background-color: ${theme.bg}; --icon-shadow: ${theme.shadow};">
+                        ${initials}
+                    </div>
+                    <span class="app-title" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function handleGlobalSearch() {
             const query = document.getElementById('main-search-input').value.toLowerCase().trim();
-            const allCats = Object.keys(categoriesMap);
-            const filtered = allCats.filter(cat => cat.toLowerCase().includes(query));
-            renderCategories(filtered);
+            
+            if (query === '') {
+                renderCategories(Object.keys(categoriesMap));
+                return;
+            }
+
+            const matchedApps = allData.filter(app => {
+                const name = (app['Website Name'] || '').toLowerCase();
+                const cat = (app['Category'] || '').toLowerCase();
+                return name.includes(query) || cat.includes(query);
+            });
+
+            renderAppsGrid(matchedApps);
         }
 
         function openCategory(catName) {
@@ -430,14 +470,14 @@
                     <div class="app-icon" style="background-color: ${theme.bg}; --icon-shadow: ${theme.shadow};">
                         ${initials}
                     </div>
-                    <span class="app-title">${escapeHtml(name)}</span>
+                    <span class="app-title" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
                 `;
                 grid.appendChild(card);
             });
         }
 
         function filterDetailApps() {
-            const query = document.getElementById('detail-search-input').value.toLowerCase().trim();
+            const query = document.getElementById('detail-search-input').value.toLowerCase().print || document.getElementById('detail-search-input').value.toLowerCase().trim();
             const apps = categoriesMap[currentCategory] || [];
             const filtered = apps.filter(app => {
                 const name = (app['Website Name'] || '').toLowerCase();
